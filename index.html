@@ -28,6 +28,10 @@
       <div class="legend-item"><span class="legend-box savings-proj"></span> Projected cumulative savings (adjustable rate)</div>
       <div class="legend-item"><span class="legend-box savings-actual"></span> Actual cumulative savings</div>
     </div>
+
+    <div class="next-step">
+      <button id="next-to-closure">Next: Key Takeaway →</button>
+    </div>
   </section>
 
   <!-- Controls (unlocked after story) -->
@@ -55,8 +59,17 @@
     </div>
   </div>
 
+  <!-- Closure scene (Scene 1.5) -->
+  <section id="closure" class="scene">
+    <div class="scene-text">
+      <h2>Summary &amp; Key Takeaway</h2>
+      <p>The checking account appears to have regular income, but one-off expenses like travel (April) and seasonal spending (December) create sharp dips that erode balance over time. Without consistent savings, these shocks accumulate impact. Exploring month-level breakdowns and simulating different savings or expense strategies helps reveal levers to stabilize finances.</p>
+      <button id="continue-explore-btn">Continue to Exploration</button>
+    </div>
+  </section>
+
   <!-- Scene 2: Exploration -->
-  <section id="scene2" class="scene">
+  <section id="scene2" class="scene locked">
     <div class="scene-text">
       <h2>Scene 2: Exploration</h2>
       <p>Adjust parameters and inspect how individual months break down by spending category. This lets you diagnose which months and categories drove balance erosion.</p>
@@ -73,7 +86,7 @@
   </section>
 
   <!-- Scene 3: What-if Scenarios -->
-  <section id="scene3" class="scene">
+  <section id="scene3" class="scene locked">
     <div class="scene-text">
       <h2>Scene 3: What-if Scenarios</h2>
       <p>Compare preset alternatives to see how different decisions would change outcomes.</p>
