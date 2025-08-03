@@ -662,6 +662,49 @@ function resetToDefaults() {
   );
 }
 
+// breadcrumb / progress indicator wiring
+function setupBreadcrumb() {
+  const order = ["scene1", "closure", "scene2", "scene3"];
+  const steps = d3.selectAll("#breadcrumb .step");
+  const sectionElems = order.map((id) => document.getElementById(id)).filter(Boolean);
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const currentId = entry.target.id;
+          // update active
+          steps.classed("active", false);
+          d3.select(`#breadcrumb .step[data-target='${currentId}']`).classed("active", true);
+
+          // completed: anything before current
+          steps.each(function () {
+            const step = d3.select(this);
+            const tgt = step.attr("data-target");
+            if (order.indexOf(tgt) < order.indexOf(currentId)) {
+              step.classed("completed", true);
+            } else {
+              step.classed("completed", false);
+            }
+          });
+        }
+      });
+    },
+    {
+      rootMargin: "-40% 0px -60% 0px",
+      threshold: 0
+    }
+  );
+  sectionElems.forEach((el) => observer.observe(el));
+
+  // clicking breadcrumbs scrolls
+  steps.on("click", function () {
+    const targetId = d3.select(this).attr("data-target");
+    const el = document.getElementById(targetId);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 function setupInteractions() {
   d3.select("#savings-slider").on("input", function () {
     const val = +this.value;
@@ -682,7 +725,7 @@ function setupInteractions() {
     document.querySelector("#closure").scrollIntoView({ behavior: "smooth", block: "start" });
   });
   d3.select("#continue-explore-btn").on("click", () => {
-    // unlock scenes 2 and 3
+    // unlock scenes 2 and 3 with transition
     d3.select("#scene2").classed("locked", false);
     d3.select("#scene3").classed("locked", false);
     // scroll to scene 2
@@ -750,6 +793,9 @@ function main() {
       d3.select("#reset-btn").on("click", () => {
         resetToDefaults();
       });
+
+      // Breadcrumb tracking
+      setupBreadcrumb();
     })
     .catch((err) => {
       console.error("CSV load failed:", err);
