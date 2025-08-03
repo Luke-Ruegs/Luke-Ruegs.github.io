@@ -110,19 +110,14 @@ function computeProjectedSavings(rate) {
 
 // special split-travel variant
 function computeSplitTravelSeries(originalCheckingOnly, startBalance) {
-  // Replace the single travel expense of -1200 on April 15 with two -600 expenses:
   const modified = originalCheckingOnly.slice().map(d => ({ ...d })); // shallow copy
-
   const travelDateStr = "2024-04-15";
-  // Remove original travel entries on that day with -1200
   const filtered = modified.filter(d => {
     if (d.category === "Travel" && d.date instanceof Date) {
       return !(d3.timeFormat("%Y-%m-%d")(d.date) === travelDateStr && d.amount === -1200);
     }
     return true;
   });
-
-  // Add two split travel expenses: Apr 15 and May 15 of -600 each
   const split1 = {
     date: d3.timeParse("%Y-%m-%d")("2024-04-15"),
     amount: -600,
@@ -143,7 +138,7 @@ function computeSplitTravelSeries(originalCheckingOnly, startBalance) {
   return computeBalanceSeries(filtered, startBalance);
 }
 
-// new helper to reliably get the travel expense point and the balance immediately after it
+// robust travel point finder with logging
 function getTravelPoint(checkingOnly) {
   let balance = initialCheckingBalance;
   const sorted = checkingOnly.slice().sort((a, b) => d3.ascending(a.date, b.date));
@@ -153,10 +148,31 @@ function getTravelPoint(checkingOnly) {
       t.category === "Travel" &&
       d3.timeFormat("%Y-%m-%d")(t.date) === "2024-04-15"
     ) {
+      console.log("Found travel transaction:", t, "Balance after travel:", balance);
       return { date: t.date, balance: +balance.toFixed(2) };
     }
   }
+  console.warn("Travel transaction not found via strict match; will fallback to nearest date.");
   return null;
+}
+
+// fallback to nearest point if travelPoint null
+function approximateTravelPoint(series, targetDateStr) {
+  const target = d3.timeParse("%Y-%m-%d")(targetDateStr);
+  if (!target) return null;
+  let closest = null;
+  let minDiff = Infinity;
+  series.forEach(d => {
+    const diff = Math.abs(d.date - target);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = d;
+    }
+  });
+  if (closest) {
+    console.log("Fallback approximate travel point used:", closest);
+  }
+  return closest;
 }
 
 function drawAll() {
@@ -246,10 +262,15 @@ function drawBalanceChart() {
       .attr("class", "no-travel-line");
   }
 
-  // annotation logic using robust travel point finder
+  // annotation logic using robust travel point finder, with fallback
   if (travelIncluded && !splitTravel) {
     const checkingOnly = rawData.filter(d => d.account === "Checking");
-    const travelPoint = getTravelPoint(checkingOnly);
+    let travelPoint = getTravelPoint(checkingOnly);
+    let usedApprox = false;
+    if (!travelPoint) {
+      travelPoint = approximateTravelPoint(seriesWithTravel, "2024-04-15");
+      usedApprox = true;
+    }
     if (travelPoint) {
       svg
         .append("circle")
@@ -258,13 +279,23 @@ function drawBalanceChart() {
         .attr("r", 6)
         .attr("fill", "#d97706");
 
-      createAnnotation(
-        svg,
-        x(travelPoint.date) + 10,
-        y(travelPoint.balance) - 40,
-        "Travel expense caused dip",
-        "Apr 15 -$1,200"
-      );
+      if (usedApprox) {
+        createAnnotation(
+          svg,
+          x(travelPoint.date) + 10,
+          y(travelPoint.balance) - 40,
+          "Travel-like dip (approx)",
+          "approximate Apr 15"
+        );
+      } else {
+        createAnnotation(
+          svg,
+          x(travelPoint.date) + 10,
+          y(travelPoint.balance) - 40,
+          "Travel expense caused dip",
+          "Apr 15 -$1,200"
+        );
+      }
       svg
         .append("path")
         .attr(
