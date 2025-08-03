@@ -537,7 +537,6 @@ function drawMonthlyBreakdown(monthStr) {
   const height = container.node().clientHeight - 60;
   const margin = { top: 20, right: 20, bottom: 40, left: 100 };
 
-  // create SVG group wrapper dimensions
   container.attr("width", width + margin.left + margin.right);
   container.attr("height", height + margin.top + margin.bottom);
   const svg = container
@@ -547,7 +546,6 @@ function drawMonthlyBreakdown(monthStr) {
   const displayName = d3.timeFormat("%B %Y")(d3.timeParse("%Y-%m")(monthStr));
 
   if (byCat.length === 0) {
-    // placeholder message in SVG
     svg
       .append("text")
       .attr("x", width / 2)
@@ -678,6 +676,26 @@ function setupInteractions() {
     splitTravel = false;
     drawBalanceChart();
   });
+
+  // scene sequencing helpers
+  d3.select("#next-to-closure").on("click", () => {
+    document.querySelector("#closure").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  d3.select("#continue-explore-btn").on("click", () => {
+    // unlock scenes 2 and 3
+    d3.select("#scene2").classed("locked", false);
+    d3.select("#scene3").classed("locked", false);
+    // scroll to scene 2
+    document.querySelector("#scene2").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  d3.select("#unlock-btn").on("click", () => {
+    d3.select("#intro-overlay").style("display", "none");
+    // highlight closure briefly
+    const closure = d3.select("#closure");
+    closure.classed("highlight", true);
+    setTimeout(() => closure.classed("highlight", false), 2000);
+  });
 }
 
 function main() {
@@ -731,11 +749,6 @@ function main() {
       // Reset
       d3.select("#reset-btn").on("click", () => {
         resetToDefaults();
-      });
-
-      // Martini glass unlock
-      d3.select("#unlock-btn").on("click", () => {
-        d3.select("#intro-overlay").style("display", "none");
       });
     })
     .catch((err) => {
