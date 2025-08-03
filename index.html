@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Personal Finance Narrative Visualization</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Personal Finance: Balance &amp; Savings Story</h1>
+    <p class="subtitle">Martini glass narrative: steady income, hidden shocks, and the power of savings choices.</p>
+  </header>
+
+  <section id="scene1" class="scene">
+    <div class="scene-text">
+      <h2>Scene 1: The Problem</h2>
+      <p>Despite regular income, variable spending and one-off expenses erode your checking balance. The dip in April is driven by a travel expense; December's drop is holiday-related. The green line shows cumulative savings; the slider lets you explore what would happen if you had saved a different percentage of income from the start.</p>
+    </div>
+    <div id="chart-container">
+      <svg id="balance-chart"></svg>
+      <svg id="savings-chart"></svg>
+    </div>
+    <div id="annotation-legend">
+      <div class="legend-item"><span class="legend-box actual"></span> Actual checking balance</div>
+      <div class="legend-item"><span class="legend-box no-travel"></span> Checking balance without travel expense</div>
+      <div class="legend-item"><span class="legend-box savings-proj"></span> Projected cumulative savings (adjustable rate)</div>
+      <div class="legend-item"><span class="legend-box savings-actual"></span> Actual cumulative savings</div>
+    </div>
+  </section>
+
+  <section id="controls">
+    <div class="control-group">
+      <label for="savings-slider">Savings Rate (would have saved from Jan 2024): 
+        <input type="range" id="savings-slider" min="5" max="25" value="15" step="1" />
+        <span id="savings-display">15%</span>
+      </label>
+    </div>
+    <div class="control-group">
+      <button id="toggle-travel">Toggle Travel Expense (April 15)</button>
+    </div>
+    <div class="control-group small">
+      <p>Note: The "projection" assumes the savings rate had been applied from January and shows hypothetical cumulative savings. The actual savings (from data) is shown for comparison.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>Data is synthetic. Built with D3.js. </p>
+  </footer>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
