@@ -12,6 +12,7 @@
     <p class="subtitle">Martini glass narrative: steady income, hidden shocks, and the power of savings choices.</p>
   </header>
 
+  <!-- Scene 1: Lead -->
   <section id="scene1" class="scene">
     <div class="scene-text">
       <h2>Scene 1: The Problem</h2>
@@ -29,6 +30,7 @@
     </div>
   </section>
 
+  <!-- Controls (unlocked after story) -->
   <section id="controls">
     <div class="control-group">
       <label for="savings-slider">Savings Rate (would have saved from Jan 2024): 
@@ -44,8 +46,51 @@
     </div>
   </section>
 
+  <!-- Martini glass unlock overlay -->
+  <div id="intro-overlay">
+    <div class="overlay-content">
+      <h2>Story First</h2>
+      <p>Income is steady, but discretionary shocks and insufficient savings erode your checking balance. The story above shows the problem. Now you can explore—adjust savings, examine monthly breakdowns, and test what-if scenarios.</p>
+      <button id="unlock-btn">Explore</button>
+    </div>
+  </div>
+
+  <!-- Scene 2: Exploration -->
+  <section id="scene2" class="scene">
+    <div class="scene-text">
+      <h2>Scene 2: Exploration</h2>
+      <p>Adjust parameters and inspect how individual months break down by spending category. This lets you diagnose which months and categories drove balance erosion.</p>
+    </div>
+    <div class="explore-controls">
+      <label for="month-select">Select Month:
+        <select id="month-select"></select>
+      </label>
+      <button id="reset-btn">Reset to Story Defaults</button>
+    </div>
+    <div id="month-breakdown">
+      <svg id="breakdown-chart"></svg>
+    </div>
+  </section>
+
+  <!-- Scene 3: What-if Scenarios -->
+  <section id="scene3" class="scene">
+    <div class="scene-text">
+      <h2>Scene 3: What-if Scenarios</h2>
+      <p>Compare preset alternatives to see how different decisions would change outcomes.</p>
+    </div>
+    <div class="scenario-buttons">
+      <button data-preset="aggressive">Aggressive Saver (25%)</button>
+      <button data-preset="conservative">Conservative Saver (10%)</button>
+      <button data-preset="split-travel">Split Travel Expense</button>
+      <button data-preset="remove-travel">Remove Travel Expense</button>
+    </div>
+    <div id="scenario-annotation" class="scene-text">
+      <p><strong>Scenario:</strong> Back to the original narrative defaults.</p>
+    </div>
+  </section>
+
   <footer>
-    <p>Data is synthetic. Built with D3.js. </p>
+    <p>Data is synthetic. Built with D3.js.</p>
   </footer>
 
   <script src="https://d3js.org/d3.v7.min.js"></script>
