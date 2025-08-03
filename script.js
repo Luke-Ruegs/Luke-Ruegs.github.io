@@ -45,6 +45,16 @@ let filteredCheckingNoTravel = [];
 let actualSavingsSeries = [];
 let projectionSavingsSeries = [];
 
+// tolerant date equality for a target YYYY-MM-DD day (matches either local or UTC interpretation)
+function isSameDay(date, targetYYYYMMDD) {
+  if (!(date instanceof Date)) return false;
+  const local = d3.timeFormat("%Y-%m-%d")(date);
+  if (local === targetYYYYMMDD) return true;
+  const iso = date.toISOString().slice(0, 10); // UTC-based
+  if (iso === targetYYYYMMDD) return true;
+  return false;
+}
+
 // reusable annotation helper
 function createAnnotation(svg, x, y, title, subtitle) {
   const padding = 6;
@@ -108,13 +118,12 @@ function computeProjectedSavings(rate) {
   return series;
 }
 
-// special split-travel variant
+// special split-travel variant (uses lenient date matching)
 function computeSplitTravelSeries(originalCheckingOnly, startBalance) {
   const modified = originalCheckingOnly.slice().map(d => ({ ...d })); // shallow copy
-  const travelDateStr = "2024-04-15";
   const filtered = modified.filter(d => {
     if (d.category === "Travel" && d.date instanceof Date) {
-      return !(d3.timeFormat("%Y-%m-%d")(d.date) === travelDateStr && d.amount === -1200);
+      return !(isSameDay(d.date, "2024-04-15") && d.amount === -1200);
     }
     return true;
   });
@@ -138,7 +147,7 @@ function computeSplitTravelSeries(originalCheckingOnly, startBalance) {
   return computeBalanceSeries(filtered, startBalance);
 }
 
-// robust travel point finder with logging
+// robust travel point finder with logging (lenient match)
 function getTravelPoint(checkingOnly) {
   let balance = initialCheckingBalance;
   const sorted = checkingOnly.slice().sort((a, b) => d3.ascending(a.date, b.date));
@@ -146,13 +155,13 @@ function getTravelPoint(checkingOnly) {
     balance += t.amount;
     if (
       t.category === "Travel" &&
-      d3.timeFormat("%Y-%m-%d")(t.date) === "2024-04-15"
+      isSameDay(t.date, "2024-04-15")
     ) {
-      console.log("Found travel transaction:", t, "Balance after travel:", balance);
+      console.log("Found travel transaction (lenient match):", t, "Balance after travel:", balance);
       return { date: t.date, balance: +balance.toFixed(2) };
     }
   }
-  console.warn("Travel transaction not found via strict match; will fallback to nearest date.");
+  console.warn("Travel transaction not found via lenient match; will fallback to nearest date.");
   return null;
 }
 
@@ -764,8 +773,7 @@ function main() {
       const noTravel = checkingOnly.filter((d) => {
         return !(
           d.category === "Travel" &&
-          d.date &&
-          d3.timeFormat("%Y-%m-%d")(d.date) === "2024-04-15"
+          isSameDay(d.date, "2024-04-15")
         );
       });
       filteredCheckingNoTravel = computeBalanceSeries(noTravel, initialCheckingBalance);
