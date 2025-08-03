@@ -477,8 +477,28 @@ function populateMonthSelector() {
     const m = d3.timeFormat("%Y-%m")(d.date);
     monthSet.add(m);
   });
-  const months = Array.from(monthSet).sort();
+  let months = Array.from(monthSet).sort();
+
+  // filter out months with no negative checking spending
+  months = months.filter((m) => {
+    const [year, month] = m.split("-");
+    return rawData.some(
+      (d) =>
+        d.account === "Checking" &&
+        d.amount < 0 &&
+        d.date instanceof Date &&
+        d.date.getFullYear() === +year &&
+        d.date.getMonth() + 1 === +month
+    );
+  });
+
   const select = d3.select("#month-select");
+  select.selectAll("option").remove();
+  if (months.length === 0) {
+    select.append("option").text("No months with spending").attr("disabled", true);
+    return;
+  }
+
   months.forEach((m) => {
     const dateObj = d3.timeParse("%Y-%m")(m);
     select
@@ -486,7 +506,7 @@ function populateMonthSelector() {
       .attr("value", m)
       .text(d3.timeFormat("%B %Y")(dateObj));
   });
-  if (months.length) drawMonthlyBreakdown(months[0]);
+  drawMonthlyBreakdown(months[0]);
   select.on("change", (e) => drawMonthlyBreakdown(e.target.value));
 }
 
@@ -501,14 +521,15 @@ function drawMonthlyBreakdown(monthStr) {
       d.amount < 0
     );
   });
+
   const byCat = d3
     .rollups(
       filtered,
       (v) => d3.sum(v, (d) => -d.amount),
       (d) => d.category
     )
-    .map(([category, amt]) => ({ category, amount: amt }));
-  byCat.sort((a, b) => b.amount - a.amount);
+    .map(([category, amt]) => ({ category, amount: amt }))
+    .sort((a, b) => b.amount - a.amount);
 
   const container = d3.select("#breakdown-chart");
   container.selectAll("*").remove();
@@ -516,12 +537,27 @@ function drawMonthlyBreakdown(monthStr) {
   const height = container.node().clientHeight - 60;
   const margin = { top: 20, right: 20, bottom: 40, left: 100 };
 
-  const svgWrapper = container
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom);
-  const svg = svgWrapper
+  // create SVG group wrapper dimensions
+  container.attr("width", width + margin.left + margin.right);
+  container.attr("height", height + margin.top + margin.bottom);
+  const svg = container
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const displayName = d3.timeFormat("%B %Y")(d3.timeParse("%Y-%m")(monthStr));
+
+  if (byCat.length === 0) {
+    // placeholder message in SVG
+    svg
+      .append("text")
+      .attr("x", width / 2)
+      .attr("y", height / 2)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "14px")
+      .attr("fill", "#555")
+      .text(`No spending breakdown data for ${displayName}.`);
+    return;
+  }
 
   const x = d3
     .scaleLinear()
@@ -559,11 +595,7 @@ function drawMonthlyBreakdown(monthStr) {
     .append("text")
     .attr("x", 0)
     .attr("y", -5)
-    .text(
-      `Spending Breakdown for ${d3.timeFormat("%B %Y")(
-        d3.timeParse("%Y-%m")(monthStr)
-      )}`
-    )
+    .text(`Spending Breakdown for ${displayName}`)
     .attr("font-weight", "700");
 }
 
