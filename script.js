@@ -2,7 +2,6 @@
 console.log("script.js loaded");
 
 function showError(msg) {
-  // Insert visible error banner at top
   d3.select("body")
     .insert("div", ":first-child")
     .style("background", "#fee2e2")
@@ -29,7 +28,7 @@ function showInfo(msg) {
 const parseDate = d3.timeParse("%Y-%m-%d");
 const formatDate = d3.timeFormat("%b %d");
 const monthlyIncome = 4500;
-const initialCheckingBalance = 5000; // consistent with synthetic data
+const initialCheckingBalance = 5000;
 let savingsRate = 0.15;
 let travelIncluded = true;
 
@@ -41,7 +40,7 @@ let projectionSavingsSeries = [];
 
 function computeBalanceSeries(transactions, startBalance) {
   let balance = startBalance;
-  const sorted = transactions.slice().sort((a,b) => d3.ascending(a.date, b.date));
+  const sorted = transactions.slice().sort((a, b) => d3.ascending(a.date, b.date));
   const series = [];
   for (const t of sorted) {
     balance += t.amount;
@@ -51,7 +50,7 @@ function computeBalanceSeries(transactions, startBalance) {
 }
 
 function computeCumulativeSavings(savingsEntries) {
-  const sorted = savingsEntries.slice().sort((a,b) => d3.ascending(a.date, b.date));
+  const sorted = savingsEntries.slice().sort((a, b) => d3.ascending(a.date, b.date));
   const series = [];
   let cumulative = 0;
   for (const e of sorted) {
@@ -89,40 +88,51 @@ function drawBalanceChart() {
     .attr("width", width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom)
     .append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
+    .attr("transform", `translate(${margin.left},${margin.top})`);
 
   if (!checkingData || checkingData.length === 0) {
     showError("No checking account data to draw balance chart.");
     return;
   }
 
-  const x = d3.scaleTime()
-    .domain(d3.extent(checkingData, d => d.date))
+  const x = d3
+    .scaleTime()
+    .domain(d3.extent(checkingData, (d) => d.date))
     .range([0, width]);
 
   const maxBal = d3.max([
-    d3.max(checkingData, d=>d.balance),
-    d3.max(filteredCheckingNoTravel, d=>d.balance)
+    d3.max(checkingData, (d) => d.balance),
+    d3.max(filteredCheckingNoTravel, (d) => d.balance),
   ]);
-  const y = d3.scaleLinear()
-    .domain([0, maxBal * 1.1])
+  const y = d3
+    .scaleLinear()
+    .domain([0, (maxBal || 0) * 1.1])
     .nice()
     .range([height, 0]);
 
-  svg.append("g")
+  svg
+    .append("g")
     .attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(x).ticks(d3.timeMonth.every(1)).tickFormat(d3.timeFormat("%b")));
+    .call(
+      d3
+        .axisBottom(x)
+        .ticks(d3.timeMonth.every(1))
+        .tickFormat(d3.timeFormat("%b"))
+    );
 
-  svg.append("g")
-    .call(d3.axisLeft(y).tickFormat(d => "$" + d));
+  svg
+    .append("g")
+    .call(d3.axisLeft(y).tickFormat((d) => "$" + d));
 
-  const line = d3.line()
-    .x(d => x(d.date))
-    .y(d => y(d.balance))
+  const line = d3
+    .line()
+    .x((d) => x(d.date))
+    .y((d) => y(d.balance))
     .curve(d3.curveMonotoneX);
 
   // actual balance line
-  svg.append("path")
+  svg
+    .append("path")
     .datum(checkingData)
     .attr("fill", "none")
     .attr("stroke", "#1f78b4")
@@ -132,7 +142,8 @@ function drawBalanceChart() {
 
   // no-travel variant if toggled off
   if (!travelIncluded) {
-    svg.append("path")
+    svg
+      .append("path")
       .datum(filteredCheckingNoTravel)
       .attr("fill", "none")
       .attr("stroke", "#a6cee3")
@@ -144,9 +155,15 @@ function drawBalanceChart() {
   // annotation for travel expense dip
   if (travelIncluded) {
     const travelDate = d3.timeParse("%Y-%m-%d")("2024-04-15");
-    const point = checkingData.find(d => d.date.getTime() === travelDate.getTime());
+    let point = null;
+    if (travelDate) {
+      point = checkingData.find(
+        (d) => d.date && d.date.getTime() === travelDate.getTime()
+      );
+    }
     if (point) {
-      svg.append("circle")
+      svg
+        .append("circle")
         .attr("cx", x(point.date))
         .attr("cy", y(point.balance))
         .attr("r", 6)
@@ -155,32 +172,51 @@ function drawBalanceChart() {
       const annoX = x(point.date) + 10;
       const annoY = y(point.balance) - 40;
       const group = svg.append("g").attr("class", "annotation");
-      group.append("rect")
+      group
+        .append("rect")
         .attr("x", annoX)
         .attr("y", annoY)
         .attr("width", 160)
         .attr("height", 50)
         .attr("class", "annotation-box");
-      group.append("text")
+      group
+        .append("text")
         .attr("x", annoX + 8)
         .attr("y", annoY + 18)
         .text("Travel expense caused dip")
         .attr("font-weight", "600")
         .attr("fill", "#92400e");
-      group.append("text")
+      group
+        .append("text")
         .attr("x", annoX + 8)
         .attr("y", annoY + 34)
         .text("Apr 15 -$1,200")
         .attr("font-size", "11px")
         .attr("fill", "#555");
-      group.append("path")
-        .attr("d", `M${annoX},${annoY+50} L${x(point.date)},${y(point.balance)}`)
+      group
+        .append("path")
+        .attr(
+          "d",
+          `M${annoX},${annoY + 50} L${x(point.date)},${y(point.balance)}`
+        )
         .attr("stroke", "#d97706")
         .attr("stroke-width", 1.5)
         .attr("fill", "none");
+    } else {
+      // fallback annotation if point is missing
+      svg
+        .append("text")
+        .attr("x", 10)
+        .attr("y", 20)
+        .text(
+          "Expected travel expense point not found in balance series; check data parsing."
+        )
+        .attr("fill", "#b91c1c")
+        .attr("font-weight", "600");
     }
   } else {
-    svg.append("text")
+    svg
+      .append("text")
       .attr("x", 10)
       .attr("y", 20)
       .text("Travel expense removed; balance improves in April")
@@ -188,7 +224,8 @@ function drawBalanceChart() {
       .attr("font-weight", "600");
   }
 
-  svg.append("text")
+  svg
+    .append("text")
     .attr("x", 0)
     .attr("y", -5)
     .text("Checking Account Balance Over Time")
@@ -198,7 +235,8 @@ function drawBalanceChart() {
   // tooltip for actual line
   const focus = svg.append("g").style("display", "none");
   focus.append("circle").attr("r", 5).attr("fill", "#1f78b4");
-  focus.append("rect")
+  focus
+    .append("rect")
     .attr("class", "tooltip")
     .attr("width", 160)
     .attr("height", 50)
@@ -208,9 +246,14 @@ function drawBalanceChart() {
     .attr("fill", "#ffffff")
     .attr("stroke", "#9ca3af")
     .attr("stroke-width", 1);
-  const tooltipText = focus.append("text").attr("x", 15).attr("y", -20).attr("font-size", "12px");
+  const tooltipText = focus
+    .append("text")
+    .attr("x", 15)
+    .attr("y", -20)
+    .attr("font-size", "12px");
 
-  svg.append("rect")
+  svg
+    .append("rect")
     .attr("width", width)
     .attr("height", height)
     .attr("fill", "none")
@@ -220,15 +263,20 @@ function drawBalanceChart() {
     .on("mousemove", (event) => {
       const [mx] = d3.pointer(event);
       const x0 = x.invert(mx);
-      const bisect = d3.bisector(d => d.date).left;
+      const bisect = d3.bisector((d) => d.date).left;
       const i = bisect(checkingData, x0);
-      const d0 = checkingData[i-1];
+      const d0 = checkingData[i - 1];
       const d1 = checkingData[i];
       let dClose = d0;
       if (d1 && Math.abs(x0 - d0.date) > Math.abs(d1.date - x0)) dClose = d1;
       if (!dClose) return;
-      focus.attr("transform", `translate(${x(dClose.date)},${y(dClose.balance)})`);
-      tooltipText.text(`${formatDate(dClose.date)}  $${dClose.balance.toFixed(2)}`);
+      focus.attr(
+        "transform",
+        `translate(${x(dClose.date)},${y(dClose.balance)})`
+      );
+      tooltipText.text(
+        `${formatDate(dClose.date)}  $${dClose.balance.toFixed(2)}`
+      );
     });
 }
 
@@ -243,52 +291,66 @@ function drawSavingsChart() {
     .attr("width", width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom)
     .append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
+    .attr("transform", `translate(${margin.left},${margin.top})`);
 
   if (!projectionSavingsSeries || projectionSavingsSeries.length === 0) {
     showError("No projection savings to draw.");
     return;
   }
 
-  const allDates = projectionSavingsSeries.map(d=>d.date).concat(actualSavingsSeries.map(d=>d.date));
-  const x = d3.scaleTime()
+  const allDates = projectionSavingsSeries
+    .map((d) => d.date)
+    .concat(actualSavingsSeries.map((d) => d.date));
+  const x = d3
+    .scaleTime()
     .domain(d3.extent(allDates))
     .range([0, width]);
 
   const maxSavings = d3.max([
-    d3.max(projectionSavingsSeries, d=>d.savings),
-    d3.max(actualSavingsSeries, d=>d.savings || 0)
+    d3.max(projectionSavingsSeries, (d) => d.savings),
+    d3.max(actualSavingsSeries, (d) => d.savings || 0),
   ]);
-  const y = d3.scaleLinear()
-    .domain([0, maxSavings * 1.1])
+  const y = d3
+    .scaleLinear()
+    .domain([0, (maxSavings || 0) * 1.1])
     .nice()
     .range([height, 0]);
 
-  svg.append("g").attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(x).ticks(d3.timeMonth.every(2)).tickFormat(d3.timeFormat("%b")));
-  svg.append("g")
-    .call(d3.axisLeft(y).tickFormat(d => "$" + d));
+  svg
+    .append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(
+      d3
+        .axisBottom(x)
+        .ticks(d3.timeMonth.every(2))
+        .tickFormat(d3.timeFormat("%b"))
+    );
+  svg.append("g").call(d3.axisLeft(y).tickFormat((d) => "$" + d));
 
-  const line = d3.line()
-    .x(d=>x(d.date))
-    .y(d=>y(d.savings))
+  const line = d3
+    .line()
+    .x((d) => x(d.date))
+    .y((d) => y(d.savings))
     .curve(d3.curveMonotoneX);
 
-  svg.append("path")
+  svg
+    .append("path")
     .datum(projectionSavingsSeries)
     .attr("fill", "none")
     .attr("stroke", "#33a02c")
     .attr("stroke-width", 2)
     .attr("d", line);
 
-  svg.append("path")
+  svg
+    .append("path")
     .datum(actualSavingsSeries)
     .attr("fill", "none")
     .attr("stroke", "#b2df8a")
     .attr("stroke-width", 2)
     .attr("d", line);
 
-  svg.append("text")
+  svg
+    .append("text")
     .attr("x", 0)
     .attr("y", -5)
     .text("Cumulative Savings: Actual vs Projected")
@@ -314,25 +376,37 @@ function setupInteractions() {
 // Main loader with diagnostics
 function main() {
   d3.csv("personal_finance_transactions.csv", d3.autoType)
-    .then(raw => {
+    .then((raw) => {
       if (!raw || raw.length === 0) {
         showError("CSV loaded but contains no rows.");
         return;
       }
       console.log("CSV loaded, rows:", raw.length);
-      raw.forEach(d => {
-        d.date = parseDate(d.date);
+
+      raw.forEach((d) => {
+        if (!(d.date instanceof Date)) {
+          d.date = parseDate(d.date);
+        }
       });
-      raw.sort((a,b) => d3.ascending(a.date, b.date));
+      raw.sort((a, b) => d3.ascending(a.date, b.date));
       rawData = raw;
 
-      const checkingOnly = raw.filter(d => d.account === "Checking");
+      const checkingOnly = raw.filter((d) => d.account === "Checking");
       checkingData = computeBalanceSeries(checkingOnly, initialCheckingBalance);
 
-      const noTravel = checkingOnly.filter(d => !(d.category === "Travel" && d3.timeFormat('%Y-%m-%d')(d.date) === '2024-04-15'));
+      const noTravel = checkingOnly.filter(
+        (d) =>
+          !(
+            d.category === "Travel" &&
+            d.date &&
+            d3.timeFormat("%Y-%m-%d")(d.date) === "2024-04-15"
+          )
+      );
       filteredCheckingNoTravel = computeBalanceSeries(noTravel, initialCheckingBalance);
 
-      const savingsEntries = raw.filter(d => d.category === "Savings Balance" && d.account === "Savings");
+      const savingsEntries = raw.filter(
+        (d) => d.category === "Savings Balance" && d.account === "Savings"
+      );
       actualSavingsSeries = computeCumulativeSavings(savingsEntries);
 
       projectionSavingsSeries = computeProjectedSavings(savingsRate);
@@ -340,9 +414,11 @@ function main() {
       drawAll();
       setupInteractions();
     })
-    .catch(err => {
+    .catch((err) => {
       console.error("CSV load failed:", err);
-      showError("Failed to load personal_finance_transactions.csv. Confirm the file exists at the root and is named exactly that. See console for details.");
+      showError(
+        "Failed to load personal_finance_transactions.csv. Confirm the file exists at the root and is named exactly that. See console for details."
+      );
     });
 }
 
