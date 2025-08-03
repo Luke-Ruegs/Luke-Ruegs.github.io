@@ -6,6 +6,7 @@ body {
   line-height: 1.4;
   background: #f7f8fa;
   color: #1f2937;
+  scroll-behavior: smooth;
 }
 header {
   padding: 1rem 1.5rem;
@@ -27,6 +28,8 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  position: relative;
+  transition: background 0.3s ease;
 }
 .scene-text {
   max-width: 800px;
@@ -140,6 +143,39 @@ footer {
 .scenario-buttons button {
   margin-right: 0.75rem;
   margin-bottom: 0.5rem;
+}
+
+.next-step {
+  margin-top: 1rem;
+}
+.next-step button {
+  background: none;
+  color: #2563eb;
+  border: 2px solid #2563eb;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+.next-step button:hover {
+  background: #2563eb;
+  color: white;
+}
+
+/* Locked dimming for exploration until unlocked */
+.locked {
+  opacity: 0.5;
+  pointer-events: none;
+  filter: blur(1px);
+}
+
+/* Highlight pulse for closure after overlay */
+.highlight {
+  animation: pulse-highlight 2s ease-in-out;
+}
+@keyframes pulse-highlight {
+  0% { box-shadow: 0 0 0 0 rgba(37,99,235,0.4); }
+  50% { box-shadow: 0 0 15px 6px rgba(37,99,235,0.3); }
+  100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
 }
 
 /* Annotation styling */
