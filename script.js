@@ -143,6 +143,22 @@ function computeSplitTravelSeries(originalCheckingOnly, startBalance) {
   return computeBalanceSeries(filtered, startBalance);
 }
 
+// new helper to reliably get the travel expense point and the balance immediately after it
+function getTravelPoint(checkingOnly) {
+  let balance = initialCheckingBalance;
+  const sorted = checkingOnly.slice().sort((a, b) => d3.ascending(a.date, b.date));
+  for (const t of sorted) {
+    balance += t.amount;
+    if (
+      t.category === "Travel" &&
+      d3.timeFormat("%Y-%m-%d")(t.date) === "2024-04-15"
+    ) {
+      return { date: t.date, balance: +balance.toFixed(2) };
+    }
+  }
+  return null;
+}
+
 function drawAll() {
   drawBalanceChart();
   drawSavingsChart();
@@ -230,24 +246,22 @@ function drawBalanceChart() {
       .attr("class", "no-travel-line");
   }
 
-  // annotation logic
+  // annotation logic using robust travel point finder
   if (travelIncluded && !splitTravel) {
-    const travelDate = d3.timeParse("%Y-%m-%d")("2024-04-15");
-    const point = seriesWithTravel.find(
-      (d) => d.date && d.date.getTime() === travelDate.getTime()
-    );
-    if (point) {
+    const checkingOnly = rawData.filter(d => d.account === "Checking");
+    const travelPoint = getTravelPoint(checkingOnly);
+    if (travelPoint) {
       svg
         .append("circle")
-        .attr("cx", x(point.date))
-        .attr("cy", y(point.balance))
+        .attr("cx", x(travelPoint.date))
+        .attr("cy", y(travelPoint.balance))
         .attr("r", 6)
         .attr("fill", "#d97706");
 
       createAnnotation(
         svg,
-        x(point.date) + 10,
-        y(point.balance) - 40,
+        x(travelPoint.date) + 10,
+        y(travelPoint.balance) - 40,
         "Travel expense caused dip",
         "Apr 15 -$1,200"
       );
@@ -255,9 +269,9 @@ function drawBalanceChart() {
         .append("path")
         .attr(
           "d",
-          `M${x(point.date) + 10},${y(point.balance) - 40 + 50} L${x(
-            point.date
-          )},${y(point.balance)}`
+          `M${x(travelPoint.date) + 10},${y(travelPoint.balance) - 40 + 50} L${x(
+            travelPoint.date
+          )},${y(travelPoint.balance)}`
         )
         .attr("stroke", "#d97706")
         .attr("stroke-width", 1.5)
