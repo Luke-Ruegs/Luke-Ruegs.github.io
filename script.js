@@ -31,6 +31,13 @@ const monthlyIncome = 4500;
 const initialCheckingBalance = 5000;
 let savingsRate = 0.15;
 let travelIncluded = true;
+let splitTravel = false; // for the split travel scenario
+
+const defaultState = {
+  savingsRate: 0.15,
+  travelIncluded: true,
+  splitTravel: false
+};
 
 let rawData = [];
 let checkingData = [];
@@ -38,6 +45,35 @@ let filteredCheckingNoTravel = [];
 let actualSavingsSeries = [];
 let projectionSavingsSeries = [];
 
+// reusable annotation helper
+function createAnnotation(svg, x, y, title, subtitle) {
+  const padding = 6;
+  const width = 160;
+  const height = 44;
+  const group = svg.append("g").attr("class", "annotation");
+  group.append("rect")
+    .attr("x", x)
+    .attr("y", y)
+    .attr("width", width)
+    .attr("height", height)
+    .attr("class", "annotation-box");
+  group.append("text")
+    .attr("x", x + padding)
+    .attr("y", y + 16)
+    .text(title)
+    .attr("font-weight", "600")
+    .attr("fill", "#92400e")
+    .attr("font-size", "12px");
+  group.append("text")
+    .attr("x", x + padding)
+    .attr("y", y + 30)
+    .text(subtitle)
+    .attr("font-size", "11px")
+    .attr("fill", "#555");
+  return group;
+}
+
+// core series computation helpers
 function computeBalanceSeries(transactions, startBalance) {
   let balance = startBalance;
   const sorted = transactions.slice().sort((a, b) => d3.ascending(a.date, b.date));
@@ -72,6 +108,41 @@ function computeProjectedSavings(rate) {
   return series;
 }
 
+// special split-travel variant
+function computeSplitTravelSeries(originalCheckingOnly, startBalance) {
+  // Replace the single travel expense of -1200 on April 15 with two -600 expenses:
+  const modified = originalCheckingOnly.slice().map(d => ({ ...d })); // shallow copy
+
+  const travelDateStr = "2024-04-15";
+  // Remove original travel entries on that day with -1200
+  const filtered = modified.filter(d => {
+    if (d.category === "Travel" && d.date instanceof Date) {
+      return !(d3.timeFormat("%Y-%m-%d")(d.date) === travelDateStr && d.amount === -1200);
+    }
+    return true;
+  });
+
+  // Add two split travel expenses: Apr 15 and May 15 of -600 each
+  const split1 = {
+    date: d3.timeParse("%Y-%m-%d")("2024-04-15"),
+    amount: -600,
+    category: "Travel",
+    type: "Expense",
+    account: "Checking",
+    description: "Split travel part 1"
+  };
+  const split2 = {
+    date: d3.timeParse("%Y-%m-%d")("2024-05-15"),
+    amount: -600,
+    category: "Travel",
+    type: "Expense",
+    account: "Checking",
+    description: "Split travel part 2"
+  };
+  filtered.push(split1, split2);
+  return computeBalanceSeries(filtered, startBalance);
+}
+
 function drawAll() {
   drawBalanceChart();
   drawSavingsChart();
@@ -84,9 +155,10 @@ function drawBalanceChart() {
   const height = container.node().clientHeight - 60;
   const margin = { top: 20, right: 60, bottom: 40, left: 60 };
 
-  const svg = container
+  const svgWrapper = container
     .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
+    .attr("height", height + margin.top + margin.bottom);
+  const svg = svgWrapper
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -95,13 +167,22 @@ function drawBalanceChart() {
     return;
   }
 
+  // choose the correct series according to state
+  let seriesWithTravel;
+  if (splitTravel) {
+    const checkingOnly = rawData.filter(d => d.account === "Checking");
+    seriesWithTravel = computeSplitTravelSeries(checkingOnly, initialCheckingBalance);
+  } else {
+    seriesWithTravel = checkingData;
+  }
+
   const x = d3
     .scaleTime()
-    .domain(d3.extent(checkingData, (d) => d.date))
+    .domain(d3.extent(seriesWithTravel, (d) => d.date))
     .range([0, width]);
 
   const maxBal = d3.max([
-    d3.max(checkingData, (d) => d.balance),
+    d3.max(seriesWithTravel, (d) => d.balance),
     d3.max(filteredCheckingNoTravel, (d) => d.balance),
   ]);
   const y = d3
@@ -119,10 +200,7 @@ function drawBalanceChart() {
         .ticks(d3.timeMonth.every(1))
         .tickFormat(d3.timeFormat("%b"))
     );
-
-  svg
-    .append("g")
-    .call(d3.axisLeft(y).tickFormat((d) => "$" + d));
+  svg.append("g").call(d3.axisLeft(y).tickFormat((d) => "$" + d));
 
   const line = d3
     .line()
@@ -130,17 +208,17 @@ function drawBalanceChart() {
     .y((d) => y(d.balance))
     .curve(d3.curveMonotoneX);
 
-  // actual balance line
+  // actual/baseline series (with current travel/splitTravel state)
   svg
     .append("path")
-    .datum(checkingData)
+    .datum(seriesWithTravel)
     .attr("fill", "none")
     .attr("stroke", "#1f78b4")
     .attr("stroke-width", 2)
     .attr("d", line)
     .attr("class", "actual-line");
 
-  // no-travel variant if toggled off
+  // no-travel variant if travelIncluded is false
   if (!travelIncluded) {
     svg
       .append("path")
@@ -152,15 +230,12 @@ function drawBalanceChart() {
       .attr("class", "no-travel-line");
   }
 
-  // annotation for travel expense dip
-  if (travelIncluded) {
+  // annotation logic
+  if (travelIncluded && !splitTravel) {
     const travelDate = d3.timeParse("%Y-%m-%d")("2024-04-15");
-    let point = null;
-    if (travelDate) {
-      point = checkingData.find(
-        (d) => d.date && d.date.getTime() === travelDate.getTime()
-      );
-    }
+    const point = seriesWithTravel.find(
+      (d) => d.date && d.date.getTime() === travelDate.getTime()
+    );
     if (point) {
       svg
         .append("circle")
@@ -169,41 +244,25 @@ function drawBalanceChart() {
         .attr("r", 6)
         .attr("fill", "#d97706");
 
-      const annoX = x(point.date) + 10;
-      const annoY = y(point.balance) - 40;
-      const group = svg.append("g").attr("class", "annotation");
-      group
-        .append("rect")
-        .attr("x", annoX)
-        .attr("y", annoY)
-        .attr("width", 160)
-        .attr("height", 50)
-        .attr("class", "annotation-box");
-      group
-        .append("text")
-        .attr("x", annoX + 8)
-        .attr("y", annoY + 18)
-        .text("Travel expense caused dip")
-        .attr("font-weight", "600")
-        .attr("fill", "#92400e");
-      group
-        .append("text")
-        .attr("x", annoX + 8)
-        .attr("y", annoY + 34)
-        .text("Apr 15 -$1,200")
-        .attr("font-size", "11px")
-        .attr("fill", "#555");
-      group
+      createAnnotation(
+        svg,
+        x(point.date) + 10,
+        y(point.balance) - 40,
+        "Travel expense caused dip",
+        "Apr 15 -$1,200"
+      );
+      svg
         .append("path")
         .attr(
           "d",
-          `M${annoX},${annoY + 50} L${x(point.date)},${y(point.balance)}`
+          `M${x(point.date) + 10},${y(point.balance) - 40 + 50} L${x(
+            point.date
+          )},${y(point.balance)}`
         )
         .attr("stroke", "#d97706")
         .attr("stroke-width", 1.5)
         .attr("fill", "none");
     } else {
-      // fallback annotation if point is missing
       svg
         .append("text")
         .attr("x", 10)
@@ -214,7 +273,15 @@ function drawBalanceChart() {
         .attr("fill", "#b91c1c")
         .attr("font-weight", "600");
     }
-  } else {
+  } else if (splitTravel) {
+    svg
+      .append("text")
+      .attr("x", 10)
+      .attr("y", 20)
+      .text("Travel expense split across Apr & May; dip is smoothed.")
+      .attr("fill", "#065f46")
+      .attr("font-weight", "600");
+  } else if (!travelIncluded) {
     svg
       .append("text")
       .attr("x", 10)
@@ -232,7 +299,7 @@ function drawBalanceChart() {
     .attr("font-size", "14px")
     .attr("font-weight", "700");
 
-  // tooltip for actual line
+  // tooltip
   const focus = svg.append("g").style("display", "none");
   focus.append("circle").attr("r", 5).attr("fill", "#1f78b4");
   focus
@@ -264,9 +331,9 @@ function drawBalanceChart() {
       const [mx] = d3.pointer(event);
       const x0 = x.invert(mx);
       const bisect = d3.bisector((d) => d.date).left;
-      const i = bisect(checkingData, x0);
-      const d0 = checkingData[i - 1];
-      const d1 = checkingData[i];
+      const i = bisect(seriesWithTravel, x0);
+      const d0 = seriesWithTravel[i - 1];
+      const d1 = seriesWithTravel[i];
       let dClose = d0;
       if (d1 && Math.abs(x0 - d0.date) > Math.abs(d1.date - x0)) dClose = d1;
       if (!dClose) return;
@@ -287,9 +354,10 @@ function drawSavingsChart() {
   const height = container.node().clientHeight - 60;
   const margin = { top: 20, right: 60, bottom: 40, left: 60 };
 
-  const svg = container
+  const svgWrapper = container
     .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
+    .attr("height", height + margin.top + margin.bottom);
+  const svg = svgWrapper
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -358,6 +426,167 @@ function drawSavingsChart() {
     .attr("font-weight", "700");
 }
 
+function populateMonthSelector() {
+  const monthSet = new Set();
+  checkingData.forEach((d) => {
+    const m = d3.timeFormat("%Y-%m")(d.date);
+    monthSet.add(m);
+  });
+  const months = Array.from(monthSet).sort();
+  const select = d3.select("#month-select");
+  months.forEach((m) => {
+    const dateObj = d3.timeParse("%Y-%m")(m);
+    select
+      .append("option")
+      .attr("value", m)
+      .text(d3.timeFormat("%B %Y")(dateObj));
+  });
+  if (months.length) drawMonthlyBreakdown(months[0]);
+  select.on("change", (e) => drawMonthlyBreakdown(e.target.value));
+}
+
+function drawMonthlyBreakdown(monthStr) {
+  const [year, month] = monthStr.split("-");
+  const filtered = rawData.filter((d) => {
+    if (d.account !== "Checking") return false;
+    if (!(d.date instanceof Date)) return false;
+    return (
+      d.date.getFullYear() === +year &&
+      d.date.getMonth() + 1 === +month &&
+      d.amount < 0
+    );
+  });
+  const byCat = d3
+    .rollups(
+      filtered,
+      (v) => d3.sum(v, (d) => -d.amount),
+      (d) => d.category
+    )
+    .map(([category, amt]) => ({ category, amount: amt }));
+  byCat.sort((a, b) => b.amount - a.amount);
+
+  const container = d3.select("#breakdown-chart");
+  container.selectAll("*").remove();
+  const width = container.node().clientWidth - 80;
+  const height = container.node().clientHeight - 60;
+  const margin = { top: 20, right: 20, bottom: 40, left: 100 };
+
+  const svgWrapper = container
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom);
+  const svg = svgWrapper
+    .append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const x = d3
+    .scaleLinear()
+    .domain([0, d3.max(byCat, (d) => d.amount) || 0])
+    .range([0, width]);
+  const y = d3
+    .scaleBand()
+    .domain(byCat.map((d) => d.category))
+    .range([0, height])
+    .padding(0.2);
+
+  svg.append("g").call(d3.axisLeft(y));
+  svg
+    .append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(
+      d3
+        .axisBottom(x)
+        .ticks(5)
+        .tickFormat((d) => "$" + Math.round(d))
+    );
+
+  svg
+    .selectAll(".bar")
+    .data(byCat)
+    .join("rect")
+    .attr("class", "bar")
+    .attr("y", (d) => y(d.category))
+    .attr("height", y.bandwidth())
+    .attr("x", 0)
+    .attr("width", (d) => x(d.amount))
+    .attr("fill", "#2563eb");
+
+  svg
+    .append("text")
+    .attr("x", 0)
+    .attr("y", -5)
+    .text(
+      `Spending Breakdown for ${d3.timeFormat("%B %Y")(
+        d3.timeParse("%Y-%m")(monthStr)
+      )}`
+    )
+    .attr("font-weight", "700");
+}
+
+function applyPreset(preset) {
+  splitTravel = false;
+  switch (preset) {
+    case "aggressive":
+      savingsRate = 0.25;
+      travelIncluded = true;
+      break;
+    case "conservative":
+      savingsRate = 0.1;
+      travelIncluded = true;
+      break;
+    case "remove-travel":
+      savingsRate = defaultState.savingsRate;
+      travelIncluded = false;
+      break;
+    case "split-travel":
+      savingsRate = defaultState.savingsRate;
+      travelIncluded = true;
+      splitTravel = true;
+      break;
+    default:
+      savingsRate = defaultState.savingsRate;
+      travelIncluded = defaultState.travelIncluded;
+      splitTravel = defaultState.splitTravel;
+  }
+
+  d3.select("#savings-slider").property("value", Math.round(savingsRate * 100));
+  d3.select("#savings-display").text(`${Math.round(savingsRate * 100)}%`);
+
+  projectionSavingsSeries = computeProjectedSavings(savingsRate);
+  drawAll();
+
+  const annotationDiv = d3.select("#scenario-annotation");
+  let msg = "";
+  if (preset === "aggressive") {
+    msg =
+      "Aggressive saver: raising the savings rate to 25% would significantly widen the gap between projected and actual savings, accelerating long-term accumulation.";
+  } else if (preset === "conservative") {
+    msg =
+      "Conservative saver: lowering to 10% slows projected savings growth, making balance vulnerability more pronounced.";
+  } else if (preset === "remove-travel") {
+    msg =
+      "Removing the travel expense eliminates the large April dip, preserving more of the checking balance early in the year.";
+  } else if (preset === "split-travel") {
+    msg =
+      "Splitting the travel expense across two months smooths the April dip and spreads the impact.";
+  } else {
+    msg = "Reset to story defaults.";
+  }
+  annotationDiv.html(`<p><strong>Scenario:</strong> ${msg}</p>`);
+}
+
+function resetToDefaults() {
+  savingsRate = defaultState.savingsRate;
+  travelIncluded = defaultState.travelIncluded;
+  splitTravel = defaultState.splitTravel;
+  d3.select("#savings-slider").property("value", Math.round(savingsRate * 100));
+  d3.select("#savings-display").text(`${Math.round(savingsRate * 100)}%`);
+  projectionSavingsSeries = computeProjectedSavings(savingsRate);
+  drawAll();
+  d3.select("#scenario-annotation").html(
+    "<p><strong>Scenario:</strong> Back to the original narrative defaults.</p>"
+  );
+}
+
 function setupInteractions() {
   d3.select("#savings-slider").on("input", function () {
     const val = +this.value;
@@ -369,11 +598,11 @@ function setupInteractions() {
 
   d3.select("#toggle-travel").on("click", () => {
     travelIncluded = !travelIncluded;
+    splitTravel = false;
     drawBalanceChart();
   });
 }
 
-// Main loader with diagnostics
 function main() {
   d3.csv("personal_finance_transactions.csv", d3.autoType)
     .then((raw) => {
@@ -394,14 +623,13 @@ function main() {
       const checkingOnly = raw.filter((d) => d.account === "Checking");
       checkingData = computeBalanceSeries(checkingOnly, initialCheckingBalance);
 
-      const noTravel = checkingOnly.filter(
-        (d) =>
-          !(
-            d.category === "Travel" &&
-            d.date &&
-            d3.timeFormat("%Y-%m-%d")(d.date) === "2024-04-15"
-          )
-      );
+      const noTravel = checkingOnly.filter((d) => {
+        return !(
+          d.category === "Travel" &&
+          d.date &&
+          d3.timeFormat("%Y-%m-%d")(d.date) === "2024-04-15"
+        );
+      });
       filteredCheckingNoTravel = computeBalanceSeries(noTravel, initialCheckingBalance);
 
       const savingsEntries = raw.filter(
@@ -413,6 +641,25 @@ function main() {
 
       drawAll();
       setupInteractions();
+
+      // Scene 2 setup
+      populateMonthSelector();
+
+      // Scene 3 buttons
+      d3.selectAll(".scenario-buttons button").on("click", function () {
+        const preset = d3.select(this).attr("data-preset");
+        applyPreset(preset);
+      });
+
+      // Reset
+      d3.select("#reset-btn").on("click", () => {
+        resetToDefaults();
+      });
+
+      // Martini glass unlock
+      d3.select("#unlock-btn").on("click", () => {
+        d3.select("#intro-overlay").style("display", "none");
+      });
     })
     .catch((err) => {
       console.error("CSV load failed:", err);
