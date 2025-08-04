@@ -4,7 +4,7 @@
 
 This is a narrative visualization built with D3.js that tells a focused story about how steady income can mask underlying volatility in a checking account balance, how one-off shocks (like a travel expense) erode that balance, and how deliberate choices—like consistent savings or smoothing large expenses—can change outcomes. It uses a **Martini Glass** structure: the problem is presented first, reinforced with a concise summary, and only after that does the user get to explore and experiment with what-if scenarios.
 
-Live version: **[PUT YOUR GITHUB.IO URL HERE]**
+Live version: https://luke-ruegs.github.io/
 
 ## Project Structure
 
